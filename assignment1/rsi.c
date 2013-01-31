@@ -89,43 +89,31 @@ int main()
 		
 		// EXECUTE INPUT
 		if (strcmp(arguments[0], "cd") == 0) {
-			// Use getcwd() and chdir()
-			
+		
 			// Make sure they only specified two arguments, the "cd" and the directory name (or blank).
 			if (number_of_arguments > 2) {
 				printf("Usage: cd [directory name]\n");
-				exit(EXIT_FAILURE);
+				continue;
 			}
 			
-			// They didn't specify a directory after cd; send them to home directory.
+			// Not specifying a directory sends them to their home directory.
 			if (number_of_arguments == 1) {
 				char *home_dir = getenv("HOME");
 				if (DEBUG_MODE) printf("User's home directory: %s\n", home_dir);
 				
-				if (chdir(home_dir) < 0) {
-					perror ("Error on chdir.");
-					//exit(EXIT_FAILURE);
-				}
-			// Special argument: "~"; send them to home directory.	
+				if (chdir(home_dir) < 0) perror ("Error on chdir");
+				
+			// Special argument: "~" sends them to their home directory.	
 			} else if (strcmp(arguments[1], "~") == 0) {
 				char *home_dir = getenv("HOME");
 				if (DEBUG_MODE) printf("User's home directory: %s\n", home_dir);
 				
-				if (chdir(home_dir) < 0) {
-					perror ("Error on chdir.");
-					//exit(EXIT_FAILURE);
-				}
+				if (chdir(home_dir) < 0) perror ("Error on chdir");
 				
 			} else {
 				if (DEBUG_MODE) printf("Changing to directory: %s\n", arguments[1]);
 				
-				int result = chdir(arguments[1]);
-				if (DEBUG_MODE) printf("Result of chdir(): %d\n", result);
-				
-				if (result < 0) {
-					perror ("Error on chdir.");
-					//exit(EXIT_FAILURE);
-				}
+				if (chdir(arguments[1]) < 0) perror ("Error on chdir");
 			}
 		} else {
 			child_pid = fork();
