@@ -33,9 +33,7 @@ void parse_command (char user_command[], char *arguments[]);
 	9. ...
 	
 	TODO:
-	1. Make it execute all commands other than cd. Do this by moving the cd compare to the top, and then have
-		the execvp be in the else block rather than in the ls|mkdir|ps compare block.
-	2. 
+	1. 
 */
 int main()
 {
@@ -136,8 +134,10 @@ int main()
 				// Fork returns 0 to the child process
 				if (child_pid == 0) {
 					if (DEBUG_MODE) printf("Child: PID of Child = %ld\n", (long) getpid());
-					
-					if (execvp(arguments[0], arguments) < 0) perror ("Error on execvp.");
+
+					if (execvp(arguments[0], arguments) < 0) {
+						printf("%s: command not found\n", arguments[0]);
+					}
 					
 				// Fork returns a new pid to the parent process
 				} else {
