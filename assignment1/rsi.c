@@ -20,6 +20,22 @@ void parse_command (char user_command[], char *arguments[]);
 	2. If not, there's no good way to decide whether or not to use execvp() or chdir() based on their input.
 	3. So we just have to parse the first argument and run a certain function based on if it's one of the above?
 	4. After executing ls using execvp, why doesn't it pring a new line anymore?
+	
+	TESTS:
+	1. mkdir test
+	2. cd test
+	3. ls
+	4. ls -l
+	5. cd ..
+	6. ps
+	7. ps -e
+	8. cat rsi.c
+	9. ...
+	
+	TODO:
+	1. Make it execute all commands other than cd. Do this by moving the cd compare to the top, and then have
+		the execvp be in the else block rather than in the ls|mkdir|ps compare block.
+	2. 
 */
 int main()
 {
@@ -74,7 +90,46 @@ int main()
 		// END OF PARSE INPUT
 		
 		// EXECUTE INPUT
-		if (strcmp(arguments[0], "ls") == 0 || strcmp(arguments[0], "mkdir") == 0) {
+		if (strcmp(arguments[0], "cd") == 0) {
+			// Use getcwd() and chdir()
+			
+			// Make sure they only specified two arguments, the "cd" and the directory name (or blank).
+			if (number_of_arguments > 2) {
+				printf("Usage: cd [directory name]\n");
+				exit(EXIT_FAILURE);
+			}
+			
+			// They didn't specify a directory after cd; send them to home directory.
+			if (number_of_arguments == 1) {
+				char *home_dir = getenv("HOME");
+				if (DEBUG_MODE) printf("User's home directory: %s\n", home_dir);
+				
+				if (chdir(home_dir) < 0) {
+					perror ("Error on chdir.");
+					//exit(EXIT_FAILURE);
+				}
+			// Special argument: "~"; send them to home directory.	
+			} else if (strcmp(arguments[1], "~") == 0) {
+				char *home_dir = getenv("HOME");
+				if (DEBUG_MODE) printf("User's home directory: %s\n", home_dir);
+				
+				if (chdir(home_dir) < 0) {
+					perror ("Error on chdir.");
+					//exit(EXIT_FAILURE);
+				}
+				
+			} else {
+				if (DEBUG_MODE) printf("Changing to directory: %s\n", arguments[1]);
+				
+				int result = chdir(arguments[1]);
+				if (DEBUG_MODE) printf("Result of chdir(): %d\n", result);
+				
+				if (result < 0) {
+					perror ("Error on chdir.");
+					//exit(EXIT_FAILURE);
+				}
+			}
+		} else {
 			child_pid = fork();
 			// If fork returns >= 0, we know it succeeded
 			if (child_pid >= 0) {
@@ -120,46 +175,7 @@ int main()
 				perror("Error forking.");
 				exit(0);
 			}
-				
-		} else if (strcmp(arguments[0], "cd") == 0) {
-			// Use getcwd() and chdir()
-			
-			// Make sure they only specified two arguments, the "cd" and the directory name (or blank).
-			if (number_of_arguments > 2) {
-				printf("Usage: cd [directory name]\n");
-				exit(EXIT_FAILURE);
-			}
-			
-			// They didn't specify a directory after cd; send them to home directory.
-			if (number_of_arguments == 1) {
-				char *home_dir = getenv("HOME");
-				if (DEBUG_MODE) printf("User's home directory: %s\n", home_dir);
-				
-				if (chdir(home_dir) < 0) {
-					perror ("Error on chdir.");
-					//exit(EXIT_FAILURE);
-				}
-			// Special argument: "~"; send them to home directory.	
-			} else if (strcmp(arguments[1], "~") == 0) {
-				char *home_dir = getenv("HOME");
-				if (DEBUG_MODE) printf("User's home directory: %s\n", home_dir);
-				
-				if (chdir(home_dir) < 0) {
-					perror ("Error on chdir.");
-					//exit(EXIT_FAILURE);
-				}
-				
-			} else {
-				if (DEBUG_MODE) printf("Changing to directory: %s\n", arguments[1]);
-				
-				int result = chdir(arguments[1]);
-				if (DEBUG_MODE) printf("Result of chdir(): %d\n", result);
-				
-				if (result < 0) {
-					perror ("Error on chdir.");
-					//exit(EXIT_FAILURE);
-				}
-			}
+
 		}
 		
 		// We are done with the arguments array
