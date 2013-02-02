@@ -19,8 +19,6 @@ void parse_command (char user_command[], char *arguments[]);
 	1. If you use fork() in the middle of a while loop, it creates a new process which basically copies the code from that point down. So the child
 		process will go all the way down to the bottom of the while loop, then will it go back to the top? Even though it didn't copy the top of the
 		while loop?
-	2. Does cd have to run in the background also? That means it would have to be done in the parent process instead of the child process, so we can't
-		use waitpid?
 	
 	TESTS:
 	1. mkdir test
@@ -43,13 +41,10 @@ static void sigchld_handler (int signal)
 	while (waitpid(-1, NULL, WNOHANG) > 0) {
 		if (DEBUG_MODE) printf("\nSIGCHLD handler activated. Received signal %d\n", signal);
 	}
-	
-	if (DEBUG_MODE)	printf("Parent process receives SIGCHLD.\n");
 }
 
 int main()
 {
-	//char user_command[MAX_INPUT_LENGTH];
 	char * user_command;
 	pid_t child_pid;
 	int child_status;
@@ -68,32 +63,16 @@ int main()
 	
 	int inputting = 1;
 	while (inputting) {
-		//printf("RSI: %s > ", getcwd(0, 0));
-		//fflush(stdin);
-		//setbuf(stdin, NULL);
-		
-		
-		
 		// TAKE INPUT
-		
 		char * prompt = malloc(snprintf(NULL, 0, "RSI: %s > ", getcwd(0, 0)) + 1);
 		sprintf(prompt, "RSI: %s > ", getcwd(0, 0));
 		
-		//fgets(user_command, sizeof(user_command), stdin);
 		user_command = readline(prompt);
-		
-		//fgetc(stdin);
-			
-		// Get rid of the trailing new line character
-		//if (user_command[strlen(user_command) - 1] == '\n') {
-		//	  user_command[strlen(user_command) - 1] = '\0';
-		//}		
 
 		if (DEBUG_MODE)	printf("Command: %s\n", user_command);
 		// END OF TAKE INPUT
 
 		// PARSE INPUT TO GET COMMANDS
-		//parse_command(user_command, arguments);
 		char **arguments = NULL;
 		int number_of_arguments = 0;
 		int i;
@@ -106,8 +85,6 @@ int main()
 		while (argument != NULL) {
 			// We know we have another argument
 			number_of_arguments ++;
-
-			if (DEBUG_MODE) printf("[%s]\n", argument);
 			
 			// Adjust the size of our argument list based on how many arguments we have parsed so far
 			arguments = realloc (arguments, sizeof (char*) * number_of_arguments);
@@ -115,6 +92,11 @@ int main()
 			argument = strtok(NULL, " ");
 		}
 
+		// If they just hit enter, don't do anything
+		if (number_of_arguments == 0) {
+			continue;
+		}
+		
 		// Check if they want to run the process in the background
 		if (strcmp(arguments[number_of_arguments - 1], "&") == 0) {
 			background_process = 1;
@@ -192,18 +174,16 @@ int main()
 					retVal = waitpid(child_pid, &child_status, opts);
 				
 					if (DEBUG_MODE) printf("PARENT: Return value of waitpid: %d\n", retVal);
-					//if (DEBUG_MODE) printf("PARENT: Child Status: %d\n", child_status);
+					if (DEBUG_MODE) printf("PARENT: Child returned with status: %d\n", child_status);
 					
 					if (retVal == -1) { 
-						perror("Fail at waitpid"); 
+						perror("Fail on waitpid"); 
 						exit(EXIT_FAILURE);
 					}
 					
-					//wait(NULL);
-					
-					//Macros below can be found by "$ man 2 waitpid"
+					// Macros below can be found by "$ man 2 waitpid"
 					 if (WIFEXITED(child_status)) {
-						printf("The child terminated normally, status code=%d\n", WEXITSTATUS(child_status));  // Display the status code of child process
+						printf("The child terminated normally, status code = %d\n", WEXITSTATUS(child_status));
 					} else if (WIFSIGNALED(child_status)) {
 						printf("The child was killed by signal %d\n", WTERMSIG(child_status));
 					} else if (WIFSTOPPED(child_status)) {
@@ -221,49 +201,11 @@ int main()
 
 		}
 		
-		// We are done with the arguments array and the current input on stdin.
-		//setbuf(stdin, NULL); // Is this necessary?
+		// Clean up! Is this necessary?
+		setbuf(stdin, NULL);
 		free(arguments);
-		//free(prompt);
+		free(prompt);
 		// END OF EXECUTE INPUT
 	}
 	
-}
-
-// Take whatever the user typed in and parse it, filling the supplied array with entries for each argument.
-// Function doesn't work since I don't know how to pass in an array and return it with the new values
-void parse_command (char user_command[], char *arguments[]) {
-	
-	int number_of_arguments = 0;
-	//char **arguments = NULL;
-	int i;
-
-	// Use strtok to grab first token. This is the command to execute.
-	char *argument = strtok(user_command, " ");
-
-	// Loop through the input until strtok returns null. Put each resulting string into an array. This will be the arguments to pass to execvp.
-	while (argument != NULL) {
-		// We know we have another argument
-		number_of_arguments ++;
-
-		if (DEBUG_MODE) printf("[%s]\n", argument);
-		
-		// Adjust the size of our argument list based on how many arguments we have parsed so far
-		arguments = realloc (arguments, sizeof (char*) * number_of_arguments);
-		arguments[number_of_arguments - 1] = argument;
-		argument = strtok(NULL, " ");
-	}
-
-	// The array needs to be null-terminated for execvp
-	arguments = realloc (arguments, sizeof (char*) * (number_of_arguments + 1));
-	arguments[number_of_arguments] = NULL;
-
-	if (DEBUG_MODE) {
-		for (i = 0; i < (number_of_arguments + 1); i++)
-			printf ("Argument %d = %s\n", i, arguments[i]);
-	}
-
-	// We're done with the user's command. Now free up the memory we used.
-	// TODO: Move this to main()
-	//free (arguments);
 }
