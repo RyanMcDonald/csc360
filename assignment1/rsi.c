@@ -10,9 +10,6 @@
 #include <readline/history.h>
 
 #define DEBUG_MODE 1
-#define MAX_INPUT_LENGTH 255
-
-void parse_command (char user_command[], char *arguments[]);
 
 /*
 	Questions: 
@@ -29,11 +26,16 @@ void parse_command (char user_command[], char *arguments[]);
 	6. ps
 	7. ps -e
 	8. cat rsi.c
-	9. ...
+	9. ls &
+	10. ls -a
 	
 	TODO:
 	1. setbuf(stdin, NULL); // Is this necessary?
 */
+
+void parse_command (char *user_command);
+void change_directory(char *directory);
+void go_home();
 
 /* SIGCHLD handler. A child process returns SIGCHLD when it is stopped or terminated. */
 static void sigchld_handler (int signal)
@@ -127,25 +129,27 @@ int main()
 				continue;
 			}
 			
+			change_directory(arguments[1]);
+			
 			// Not specifying a directory sends them to their home directory.
-			if (number_of_arguments == 1) {
-				char *home_dir = getenv("HOME");
-				if (DEBUG_MODE) printf("User's home directory: %s\n", home_dir);
+			//if (number_of_arguments == 1) {
+			//	char *home_dir = getenv("HOME");
+			//	if (DEBUG_MODE) printf("User's home directory: %s\n", home_dir);
 				
-				if (chdir(home_dir) < 0) perror ("Error on chdir");
+			//	if (chdir(home_dir) < 0) perror ("Error on chdir");
 				
 			// Special argument: "~" sends them to their home directory.	
-			} else if (strcmp(arguments[1], "~") == 0) {
-				char *home_dir = getenv("HOME");
-				if (DEBUG_MODE) printf("User's home directory: %s\n", home_dir);
+			//} else if (strcmp(arguments[1], "~") == 0) {
+			//	char *home_dir = getenv("HOME");
+			//	if (DEBUG_MODE) printf("User's home directory: %s\n", home_dir);
 				
-				if (chdir(home_dir) < 0) perror ("Error on chdir");
+			//	if (chdir(home_dir) < 0) perror ("Error on chdir");
 				
-			} else {
-				if (DEBUG_MODE) printf("Changing to directory: %s\n", arguments[1]);
+			//} else {
+			//	if (DEBUG_MODE) printf("Changing to directory: %s\n", arguments[1]);
 				
-				if (chdir(arguments[1]) < 0) perror ("Error on chdir");
-			}
+			//	if (chdir(arguments[1]) < 0) perror ("Error on chdir");
+			//}
 		} else {
 			child_pid = fork();
 			// If fork returns >= 0, we know it succeeded
@@ -208,4 +212,31 @@ int main()
 		// END OF EXECUTE INPUT
 	}
 	
+}
+
+void parse_command(char *user_command) {
+	
+}
+
+void change_directory(char *directory) {
+	// Not specifying a directory sends them to their home directory.
+	if (directory == NULL) {
+		go_home();
+		
+	// Special argument: "~" sends them to their home directory.	
+	} else if (strcmp(directory, "~") == 0) {
+		go_home();
+		
+	} else {
+		if (DEBUG_MODE) printf("Changing to directory: %s\n", directory);
+		
+		if (chdir(directory) < 0) perror ("Error on chdir");
+	}
+}
+
+void go_home() {
+	char *home_dir = getenv("HOME");
+		if (DEBUG_MODE) printf("User's home directory: %s\n", home_dir);
+		
+		if (chdir(home_dir) < 0) perror ("Error on chdir");
 }
