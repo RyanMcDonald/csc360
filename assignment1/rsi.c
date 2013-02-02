@@ -131,25 +131,6 @@ int main()
 			
 			change_directory(arguments[1]);
 			
-			// Not specifying a directory sends them to their home directory.
-			//if (number_of_arguments == 1) {
-			//	char *home_dir = getenv("HOME");
-			//	if (DEBUG_MODE) printf("User's home directory: %s\n", home_dir);
-				
-			//	if (chdir(home_dir) < 0) perror ("Error on chdir");
-				
-			// Special argument: "~" sends them to their home directory.	
-			//} else if (strcmp(arguments[1], "~") == 0) {
-			//	char *home_dir = getenv("HOME");
-			//	if (DEBUG_MODE) printf("User's home directory: %s\n", home_dir);
-				
-			//	if (chdir(home_dir) < 0) perror ("Error on chdir");
-				
-			//} else {
-			//	if (DEBUG_MODE) printf("Changing to directory: %s\n", arguments[1]);
-				
-			//	if (chdir(arguments[1]) < 0) perror ("Error on chdir");
-			//}
 		} else {
 			child_pid = fork();
 			// If fork returns >= 0, we know it succeeded
@@ -211,10 +192,6 @@ int main()
 		free(prompt);
 		// END OF EXECUTE INPUT
 	}
-	
-}
-
-void parse_command(char *user_command) {
 	
 }
 
