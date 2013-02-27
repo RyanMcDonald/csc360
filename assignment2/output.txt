@@ -1,0 +1,140 @@
+Simulation starting...
+Flow  1 arrives: arrival time (0.13), transmission time (1.0), priority (1) 
+Flow  1 starts its transmission at time 0.13 
+Flow  6 arrives: arrival time (0.13), transmission time (1.7), priority (1) 
+Flow  6 waits for the finish of flow  1 
+Flow  7 arrives: arrival time (0.13), transmission time (1.0), priority (2) 
+Flow  7 waits for the finish of flow  1 
+Flow 11 arrives: arrival time (0.13), transmission time (0.1), priority (1) 
+Flow 11 waits for the finish of flow  1 
+Flow  2 arrives: arrival time (0.33), transmission time (1.0), priority (2) 
+Flow  2 waits for the finish of flow  1 
+Flow 12 arrives: arrival time (0.33), transmission time (1.0), priority (2) 
+Flow 12 waits for the finish of flow  1 
+Flow  3 arrives: arrival time (0.43), transmission time (1.0), priority (3) 
+Flow  3 waits for the finish of flow  1 
+Flow  8 arrives: arrival time (0.43), transmission time (1.0), priority (1) 
+Flow  8 waits for the finish of flow  1 
+Flow 13 arrives: arrival time (0.43), transmission time (1.0), priority (3) 
+Flow 13 waits for the finish of flow  1 
+Flow  4 arrives: arrival time (0.53), transmission time (1.2), priority (4) 
+Flow  4 waits for the finish of flow  1 
+Flow 14 arrives: arrival time (0.53), transmission time (1.2), priority (4) 
+Flow 14 waits for the finish of flow  1 
+Flow  5 arrives: arrival time (0.63), transmission time (1.0), priority (5) 
+Flow  5 waits for the finish of flow  1 
+Flow 10 arrives: arrival time (0.63), transmission time (1.0), priority (5) 
+Flow 10 waits for the finish of flow  1 
+Flow  1 finishes its transmission at time 1.13 
+Flow  6 waits for the finish of flow  1 
+Flow  7 waits for the finish of flow  1 
+Flow 11 starts its transmission at time 1.13 
+Flow  2 waits for the finish of flow 11 
+Flow 12 waits for the finish of flow 11 
+Flow  3 waits for the finish of flow 11 
+Flow  8 waits for the finish of flow 11 
+Flow 13 waits for the finish of flow 11 
+Flow  4 waits for the finish of flow 11 
+Flow 14 waits for the finish of flow 11 
+Flow  5 waits for the finish of flow 11 
+Flow 10 waits for the finish of flow 11 
+Flow 11 finishes its transmission at time 1.23 
+Flow  6 starts its transmission at time 1.23 
+Flow  7 waits for the finish of flow  6 
+Flow  2 waits for the finish of flow  6 
+Flow 12 waits for the finish of flow  6 
+Flow  3 waits for the finish of flow  6 
+Flow  8 waits for the finish of flow  6 
+Flow 13 waits for the finish of flow  6 
+Flow  4 waits for the finish of flow  6 
+Flow 14 waits for the finish of flow  6 
+Flow  5 waits for the finish of flow  6 
+Flow 10 waits for the finish of flow  6 
+Flow  6 finishes its transmission at time 2.93 
+Flow  7 waits for the finish of flow  6 
+Flow  2 waits for the finish of flow  6 
+Flow 12 waits for the finish of flow  6 
+Flow  3 waits for the finish of flow  6 
+Flow  8 starts its transmission at time 2.93 
+Flow 13 waits for the finish of flow  8 
+Flow  4 waits for the finish of flow  8 
+Flow 14 waits for the finish of flow  8 
+Flow  5 waits for the finish of flow  8 
+Flow 10 waits for the finish of flow  8 
+Flow  8 finishes its transmission at time 3.93 
+Flow  7 starts its transmission at time 3.93 
+Flow  2 waits for the finish of flow  7 
+Flow 12 waits for the finish of flow  7 
+Flow  3 waits for the finish of flow  7 
+Flow 13 waits for the finish of flow  7 
+Flow  4 waits for the finish of flow  7 
+Flow 14 waits for the finish of flow  7 
+Flow  5 waits for the finish of flow  7 
+Flow 10 waits for the finish of flow  7 
+Flow  7 finishes its transmission at time 4.93 
+Flow  2 starts its transmission at time 4.93 
+Flow 12 waits for the finish of flow  2 
+Flow  3 waits for the finish of flow  2 
+Flow 13 waits for the finish of flow  2 
+Flow  4 waits for the finish of flow  2 
+Flow 14 waits for the finish of flow  2 
+Flow  5 waits for the finish of flow  2 
+Flow 10 waits for the finish of flow  2 
+Flow  9 arrives: arrival time (5.03), transmission time (1.2), priority (4) 
+Flow  9 waits for the finish of flow  2 
+Flow  2 finishes its transmission at time 5.93 
+Flow 12 starts its transmission at time 5.93 
+Flow  3 waits for the finish of flow 12 
+Flow 13 waits for the finish of flow 12 
+Flow  4 waits for the finish of flow 12 
+Flow 14 waits for the finish of flow 12 
+Flow  5 waits for the finish of flow 12 
+Flow 10 waits for the finish of flow 12 
+Flow  9 waits for the finish of flow 12 
+Flow 15 arrives: arrival time (6.03), transmission time (1.0), priority (5) 
+Flow 15 waits for the finish of flow 12 
+Flow 12 finishes its transmission at time 6.93 
+Flow  3 starts its transmission at time 6.93 
+Flow 13 waits for the finish of flow  3 
+Flow  4 waits for the finish of flow  3 
+Flow 14 waits for the finish of flow  3 
+Flow  5 waits for the finish of flow  3 
+Flow 10 waits for the finish of flow  3 
+Flow  9 waits for the finish of flow  3 
+Flow 15 waits for the finish of flow  3 
+Flow  3 finishes its transmission at time 7.93 
+Flow 13 starts its transmission at time 7.93 
+Flow  4 waits for the finish of flow 13 
+Flow 14 waits for the finish of flow 13 
+Flow  5 waits for the finish of flow 13 
+Flow 10 waits for the finish of flow 13 
+Flow  9 waits for the finish of flow 13 
+Flow 15 waits for the finish of flow 13 
+Flow 13 finishes its transmission at time 8.93 
+Flow  4 starts its transmission at time 8.93 
+Flow 14 waits for the finish of flow  4 
+Flow  5 waits for the finish of flow  4 
+Flow 10 waits for the finish of flow  4 
+Flow  9 waits for the finish of flow  4 
+Flow 15 waits for the finish of flow  4 
+Flow  4 finishes its transmission at time 10.13 
+Flow 14 starts its transmission at time 10.13 
+Flow  5 waits for the finish of flow 14 
+Flow 10 waits for the finish of flow 14 
+Flow  9 waits for the finish of flow 14 
+Flow 15 waits for the finish of flow 14 
+Flow 14 finishes its transmission at time 11.33 
+Flow  5 waits for the finish of flow 14 
+Flow 10 waits for the finish of flow 14 
+Flow  9 starts its transmission at time 11.33 
+Flow 15 waits for the finish of flow  9 
+Flow  9 finishes its transmission at time 12.53 
+Flow  5 starts its transmission at time 12.53 
+Flow 10 waits for the finish of flow  5 
+Flow 15 waits for the finish of flow  5 
+Flow  5 finishes its transmission at time 13.53 
+Flow 10 starts its transmission at time 13.53 
+Flow 15 waits for the finish of flow 10 
+Flow 10 finishes its transmission at time 14.53 
+Flow 15 starts its transmission at time 14.54 
+Flow 15 finishes its transmission at time 15.54 
