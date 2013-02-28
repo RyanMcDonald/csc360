@@ -1,12 +1,15 @@
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
+#include "mfs.h"
 
 typedef struct {
-	int id;
-	int arrivalTime;
-	int transmissionTime;
+	int flowNumber;
+	float arrivalTime;
+	float transmissionTime;
 	int priority;
+	pthread_t threadId;
 } flow;
 
 typedef flow * flowPointer;
@@ -18,15 +21,44 @@ flow *flowQueue;
 
 int main(int argc, char *argv[])
 {
+	// Start scheduler thread
+	
+	
 	if(argc != 2)
 	{
 		fprintf(stderr, "Usage: MFS <input file>\n");
 		return -1;
 	}
 	
-	// Parse file. Use atoi to convert chars to ints
+	// Parse input file and put all flows into flowQueue
+	getFlows(argv[1]);
+	
+	// TODO: Divide each arrival/transit time by 10 to get milliseconds
+	
+	// Create all the threads
+	int i;
+	for (i = 0; i < numberOfFlows; i ++)
+	{
+		pthread_create(&flowQueue[i].threadId, NULL, flowFunction, &flowQueue[i]);
+		printf("Created Flow: Flow Number: %d Flow Arrival time: %2.2f Flow Transmission Time: %2.2f Flow Priority: %d Flow Thread ID: %u\n", flowQueue[i].flowNumber, flowQueue[i].arrivalTime, flowQueue[i].transmissionTime, flowQueue[i].priority, (int) flowQueue[i].threadId);
+	}
+	
+	// Wait for all threads to finish
+	for (i = 0; i < numberOfFlows; i ++)
+	{
+		pthread_join(flowQueue[i].threadId, NULL);
+		printf("Stopped Flow Number: %d\n", flowQueue[i].flowNumber);
+	}
+	
+	free(flowQueue);
+	
+	return 0; // Success!?
+}
+
+void getFlows(char *fileName)
+{
 	FILE *inputFilePointer;
-	inputFilePointer = fopen(argv[1], "r");
+	inputFilePointer = fopen(fileName, "r");
 	
 	if (inputFilePointer == NULL)
 	{
@@ -41,7 +73,11 @@ int main(int argc, char *argv[])
 	remainingFlows = 1;
 	while (!feof(inputFilePointer)) {
 		flow inputFlow;
-		if (fscanf(inputFilePointer, "%d:%d,%d,%d", &inputFlow.id, &inputFlow.arrivalTime, &inputFlow.transmissionTime, &inputFlow.priority) != 4) break;
+		if (fscanf(inputFilePointer, "%d:%f,%f,%d", &inputFlow.flowNumber, &inputFlow.arrivalTime, &inputFlow.transmissionTime, &inputFlow.priority) != 4) break;
+		
+		// Put the times in seconds instead of milliseconds
+		inputFlow.arrivalTime /= 10;
+		inputFlow.transmissionTime /= 10;
 		
 		// Put all flows into flow structs and put them into the array/makeshift waiting queue.
 		flowQueue[remainingFlows - 1] = inputFlow;
@@ -50,20 +86,36 @@ int main(int argc, char *argv[])
 	
 	// Don't need the file anymore
 	fclose(inputFilePointer);
-	
-	// TODO: Divide each arrival/transit time by 10 to get milliseconds
-	
-	// for each flow: pthread_create(threadId, NULL, print_function);
-	int i;
-	for (i = 0; i < numberOfFlows; i ++)
-	{
-		flow currentFlow = flowQueue[i];
-		printf("Flow id: %d Flow Arrival time: %d Flow transmission time: %d Flow priority: %d\n", currentFlow.id, currentFlow.arrivalTime, currentFlow.transmissionTime, currentFlow.priority);
-	}
-	
+}
+
+void *flowFunction(void *pointer)
+{
 	// Use gettimeofday to get current system times
+	flowPointer flowInfo = (flowPointer) pointer;
 	
+	// Sleep until its arrival time.
+	printf("Sleeping for %2.2f\n", flowInfo->arrivalTime);
+	sleep(flowInfo->arrivalTime);
 	
+	// Add itself to the queue of flows waiting to transmit (mutex protected).
+	// Waits for its turn to transmit (condvar, w/ mutex).
+	// Transmits.
+	// Decrement the number of remaining flows (mutex protected).
+	// Signals the scheduler that another flow can transmit (condvar, w/ mutex).
 	
-	return 0; // Success!?
+	return (void *) 0;
+}
+
+void *schedulerFunction(void *pointer)
+{
+	// Loop until number of remaining flows == 0:
+    // Waits to be signaled that another flow can transmit.
+	// While the queue of flows waiting to transmit is empty:
+	// {
+			//Do nothing.
+	//	}
+	// Sort the queue of flows waiting to transmit (mutex’d).
+	// Remove the head of the queue and signal flow to transmit
+	
+	return (void *) 0;
 }
