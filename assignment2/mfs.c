@@ -17,10 +17,15 @@ typedef flow * flowPointer;
 int numberOfFlows;
 int remainingFlows;
 
+flow *allFlows;
 flow *flowQueue;
+
+pthread_mutex_t flowQueueMutex = PTHREAD_MUTEX_INITIALIZER;
 
 int main(int argc, char *argv[])
 {
+	int i;
+	
 	// Start scheduler thread
 	
 	
@@ -30,26 +35,33 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 	
-	// Parse input file and put all flows into flowQueue
+	// Parse input file and put all flows into allFlows
 	getFlows(argv[1]);
 	
-	// TODO: Divide each arrival/transit time by 10 to get milliseconds
-	
-	// Create all the threads
-	int i;
+	// Create the queue for the threads to wait in. Set the default queue values to an empty flow, i.e. flow number = 0.
+	flowQueue = malloc(numberOfFlows * sizeof(flow));
+	flow emptyFlow;
+	emptyFlow.flowNumber = 0;
 	for (i = 0; i < numberOfFlows; i ++)
 	{
-		pthread_create(&flowQueue[i].threadId, NULL, flowFunction, &flowQueue[i]);
-		printf("Created Flow: Flow Number: %d Flow Arrival time: %2.2f Flow Transmission Time: %2.2f Flow Priority: %d Flow Thread ID: %u\n", flowQueue[i].flowNumber, flowQueue[i].arrivalTime, flowQueue[i].transmissionTime, flowQueue[i].priority, (int) flowQueue[i].threadId);
+		flowQueue[i] = emptyFlow;
+	}
+	
+	// Create all the threads
+	for (i = 0; i < numberOfFlows; i ++)
+	{
+		pthread_create(&allFlows[i].threadId, NULL, flowFunction, &allFlows[i]);
+		//printf("Created Flow: Flow Number: %d Flow Arrival time: %2.2f Flow Transmission Time: %2.2f Flow Priority: %d Flow Thread ID: %u\n", allFlows[i].flowNumber, allFlows[i].arrivalTime, allFlows[i].transmissionTime, allFlows[i].priority, (int) allFlows[i].threadId);
 	}
 	
 	// Wait for all threads to finish
 	for (i = 0; i < numberOfFlows; i ++)
 	{
-		pthread_join(flowQueue[i].threadId, NULL);
-		printf("Stopped Flow Number: %d\n", flowQueue[i].flowNumber);
+		pthread_join(allFlows[i].threadId, NULL);
+		//printf("Stopped Flow Number: %d\n", allFlows[i].flowNumber);
 	}
 	
+	free(allFlows);
 	free(flowQueue);
 	
 	return 0; // Success!?
@@ -69,7 +81,7 @@ void getFlows(char *fileName)
 	// Read the first line to find how many flows we have
 	fscanf(inputFilePointer, "%d", &numberOfFlows);
 	
-	flowQueue = malloc(numberOfFlows * sizeof(flow));
+	allFlows = malloc(numberOfFlows * sizeof(flow));
 	remainingFlows = 1;
 	while (!feof(inputFilePointer)) {
 		flow inputFlow;
@@ -80,7 +92,7 @@ void getFlows(char *fileName)
 		inputFlow.transmissionTime /= 10;
 		
 		// Put all flows into flow structs and put them into the array/makeshift waiting queue.
-		flowQueue[remainingFlows - 1] = inputFlow;
+		allFlows[remainingFlows - 1] = inputFlow;
 		remainingFlows ++;
 	}
 	
@@ -90,14 +102,29 @@ void getFlows(char *fileName)
 
 void *flowFunction(void *pointer)
 {
+	int i;
+	
 	// Use gettimeofday to get current system times
 	flowPointer flowInfo = (flowPointer) pointer;
 	
 	// Sleep until its arrival time.
-	printf("Sleeping for %2.2f\n", flowInfo->arrivalTime);
 	sleep(flowInfo->arrivalTime);
+	printf("Flow %d arrived at: %2.2f\n", flowInfo->flowNumber, flowInfo->arrivalTime);
 	
 	// Add itself to the queue of flows waiting to transmit (mutex protected).
+	//pthread_mutex_lock(&flowQueueMutex);
+	for (i = 0; i < numberOfFlows; i ++)
+	{
+		// Find the first empty spot in the queue; the end of the line. A flow with a flow number of 0 is considered empty.
+		if (flowQueue[i].flowNumber == 0)
+		{
+			flowQueue[i] = *flowInfo;
+			printf("AFTER INSERT: Flow %d took queue position %d arrival time %2.2f transmission time %2.2f priority %d\n", flowQueue[i].flowNumber, i, flowQueue[i].arrivalTime, flowQueue[i].transmissionTime, flowQueue[i].priority);
+			break;
+		}
+	}
+	//pthread_mutex_unlock(&flowQueueMutex);
+	
 	// Waits for its turn to transmit (condvar, w/ mutex).
 	// Transmits.
 	// Decrement the number of remaining flows (mutex protected).
