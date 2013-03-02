@@ -4,5 +4,7 @@
 void getFlows(char *fileName);
 void *flowFunction(void *pointer);
 void *schedulerFunction(void *pointer);
+double getElapsedTime();
+int compareFlows(void *flowA, void *flowB);
 
 #endif

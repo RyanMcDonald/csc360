@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <sys/time.h>
 #include "mfs.h"
 
 typedef struct {
@@ -13,6 +14,8 @@ typedef struct {
 } flow;
 
 typedef flow * flowPointer;
+
+struct timeval startTime;
 
 int numberOfFlows;
 int remainingFlows;
@@ -26,8 +29,12 @@ int main(int argc, char *argv[])
 {
 	int i;
 	
-	// Start scheduler thread
+	// Keep track of when the simulation starts
+	gettimeofday(&startTime, NULL);
 	
+	// Start scheduler thread
+	pthread_t schedulerThreadId;
+	pthread_create(&schedulerThreadId, NULL, schedulerFunction, NULL);
 	
 	if(argc != 2)
 	{
@@ -35,7 +42,7 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 	
-	// Parse input file and put all flows into allFlows
+	// Parse input file, put all flows into allFlows, initialize remainingFlows
 	getFlows(argv[1]);
 	
 	// Create the queue for the threads to wait in. Set the default queue values to an empty flow, i.e. flow number = 0.
@@ -51,7 +58,6 @@ int main(int argc, char *argv[])
 	for (i = 0; i < numberOfFlows; i ++)
 	{
 		pthread_create(&allFlows[i].threadId, NULL, flowFunction, &allFlows[i]);
-		//printf("Created Flow: Flow Number: %d Flow Arrival time: %2.2f Flow Transmission Time: %2.2f Flow Priority: %d Flow Thread ID: %u\n", allFlows[i].flowNumber, allFlows[i].arrivalTime, allFlows[i].transmissionTime, allFlows[i].priority, (int) allFlows[i].threadId);
 	}
 	
 	// Wait for all threads to finish
@@ -60,6 +66,8 @@ int main(int argc, char *argv[])
 		pthread_join(allFlows[i].threadId, NULL);
 		//printf("Stopped Flow Number: %d\n", allFlows[i].flowNumber);
 	}
+	
+	pthread_join(schedulerThreadId, NULL);
 	
 	free(allFlows);
 	free(flowQueue);
@@ -87,7 +95,7 @@ void getFlows(char *fileName)
 		flow inputFlow;
 		if (fscanf(inputFilePointer, "%d:%f,%f,%d", &inputFlow.flowNumber, &inputFlow.arrivalTime, &inputFlow.transmissionTime, &inputFlow.priority) != 4) break;
 		
-		// Put the times in seconds instead of milliseconds
+		// Put the times in seconds
 		inputFlow.arrivalTime /= 10;
 		inputFlow.transmissionTime /= 10;
 		
@@ -104,31 +112,39 @@ void *flowFunction(void *pointer)
 {
 	int i;
 	
-	// Use gettimeofday to get current system times
 	flowPointer flowInfo = (flowPointer) pointer;
 	
 	// Sleep until its arrival time.
 	sleep(flowInfo->arrivalTime);
-	printf("Flow %d arrived at: %2.2f\n", flowInfo->flowNumber, flowInfo->arrivalTime);
+	printf("Flow %d arrives: arrival time (%f), transmission time (%.1f), priority (%d).\n", flowInfo->flowNumber, getElapsedTime(), flowInfo->transmissionTime, flowInfo->priority);
 	
 	// Add itself to the queue of flows waiting to transmit (mutex protected).
-	//pthread_mutex_lock(&flowQueueMutex);
+	pthread_mutex_lock(&flowQueueMutex);
 	for (i = 0; i < numberOfFlows; i ++)
 	{
 		// Find the first empty spot in the queue; the end of the line. A flow with a flow number of 0 is considered empty.
 		if (flowQueue[i].flowNumber == 0)
 		{
 			flowQueue[i] = *flowInfo;
-			printf("AFTER INSERT: Flow %d took queue position %d arrival time %2.2f transmission time %2.2f priority %d\n", flowQueue[i].flowNumber, i, flowQueue[i].arrivalTime, flowQueue[i].transmissionTime, flowQueue[i].priority);
+			//printf("AFTER INSERT: Flow %d took queue position %d arrival time %2.2f transmission time %2.2f priority %d\n", flowQueue[i].flowNumber, i, flowQueue[i].arrivalTime, flowQueue[i].transmissionTime, flowQueue[i].priority);
 			break;
 		}
 	}
-	//pthread_mutex_unlock(&flowQueueMutex);
+	pthread_mutex_unlock(&flowQueueMutex);
 	
 	// Waits for its turn to transmit (condvar, w/ mutex).
-	// Transmits.
+	
+	// Transmit
+	printf("Flow %d starts its transmission at time %f.\n", flowInfo->flowNumber, getElapsedTime());
+	sleep(flowInfo->transmissionTime);
+	
 	// Decrement the number of remaining flows (mutex protected).
+	//pthread_mutex_lock(&remainingFlowsMutex);
+	remainingFlows --;
+	//pthread_mutex_unlock(&remainingFlowsMutex);
+	
 	// Signals the scheduler that another flow can transmit (condvar, w/ mutex).
+	//pthread_cond_signal(&nobodyTransmittingCondVar);
 	
 	return (void *) 0;
 }
@@ -142,7 +158,72 @@ void *schedulerFunction(void *pointer)
 			//Do nothing.
 	//	}
 	// Sort the queue of flows waiting to transmit (mutex’d).
+	
+	
 	// Remove the head of the queue and signal flow to transmit
 	
 	return (void *) 0;
+}
+
+double getElapsedTime()
+{
+	struct timeval tv;
+	gettimeofday(&tv, NULL);
+	
+	double elapsedTime = (tv.tv_sec - startTime.tv_sec) * 1.0;
+	elapsedTime += (tv.tv_usec - startTime.tv_usec) / 1000000.0; // Microseconds to seconds
+	
+	return elapsedTime;
+}
+
+/* Return values:
+-1 if flowA > flowB
++1 if flowA < flowB */
+int compareFlows(void *pointerA, void *pointerB)
+{
+	flowPointer flowA = (flowPointer) pointerA;
+	flowPointer flowB = (flowPointer) pointerB;
+	
+	if (flowA->priority < flowB->priority)
+	{
+		return -1;
+	}
+	else if (flowA->priority > flowB->priority)
+	{
+		return 1;
+	}
+	else
+	{
+		if (flowA->arrivalTime < flowB->arrivalTime)
+		{
+			return -1;
+		}
+		else if (flowA->arrivalTime > flowB->arrivalTime)
+		{
+			return 1;
+		}
+		else
+		{
+			if (flowA->transmissionTime < flowB->transmissionTime)
+			{
+				return -1;
+			}
+			else if (flowA->transmissionTime > flowB->transmissionTime)
+			{
+				return 1;
+			}
+			else
+			{
+				if (flowA->flowNumber < flowB->flowNumber)
+				{
+					return -1;
+				}
+				else
+				{
+					return 1;
+				}
+			}
+		}
+	}
+	
 }
