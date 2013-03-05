@@ -11,6 +11,7 @@ typedef struct {
 	float transmissionTime;
 	int priority;
 	pthread_t threadId;
+	pthread_cond_t readyToTransmitCondVar;
 } flow;
 
 typedef flow * flowPointer;
@@ -20,10 +21,14 @@ struct timeval startTime;
 int numberOfFlows;
 int remainingFlows;
 
-flow *allFlows;
-flow *flowQueue;
+flowPointer *allFlows;
+flowPointer *flowQueue;
 
+pthread_cond_t nobodyTransmittingCondVar = PTHREAD_COND_INITIALIZER;
+
+pthread_mutex_t remainingFlowsMutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t flowQueueMutex = PTHREAD_MUTEX_INITIALIZER;
+
 
 int main(int argc, char *argv[])
 {
@@ -32,38 +37,42 @@ int main(int argc, char *argv[])
 	// Keep track of when the simulation starts
 	gettimeofday(&startTime, NULL);
 	
-	// Start scheduler thread
-	pthread_t schedulerThreadId;
-	pthread_create(&schedulerThreadId, NULL, schedulerFunction, NULL);
-	
 	if(argc != 2)
 	{
 		fprintf(stderr, "Usage: MFS <input file>\n");
 		return -1;
 	}
-	
+
 	// Parse input file, put all flows into allFlows, initialize remainingFlows
 	getFlows(argv[1]);
 	
 	// Create the queue for the threads to wait in. Set the default queue values to an empty flow, i.e. flow number = 0.
-	flowQueue = malloc(numberOfFlows * sizeof(flow));
+	flowQueue = malloc(numberOfFlows * sizeof(flowPointer));
 	flow emptyFlow;
 	emptyFlow.flowNumber = 0;
 	for (i = 0; i < numberOfFlows; i ++)
 	{
-		flowQueue[i] = emptyFlow;
+		flowQueue[i] = &emptyFlow;
 	}
+	
+	// Start scheduler thread
+	pthread_t schedulerThreadId;
+	pthread_create(&schedulerThreadId, NULL, schedulerFunction, NULL);
 	
 	// Create all the threads
 	for (i = 0; i < numberOfFlows; i ++)
 	{
-		pthread_create(&allFlows[i].threadId, NULL, flowFunction, &allFlows[i]);
+		pthread_create(&(allFlows[i]->threadId), NULL, flowFunction, allFlows[i]);
 	}
+	
+	// Tell the scheduler to start transmitting
+	//printf("MAIN: Signalling Scheduler to schedule a flow!\n");
+	pthread_cond_signal(&nobodyTransmittingCondVar);
 	
 	// Wait for all threads to finish
 	for (i = 0; i < numberOfFlows; i ++)
 	{
-		pthread_join(allFlows[i].threadId, NULL);
+		pthread_join(allFlows[i]->threadId, NULL);
 		//printf("Stopped Flow Number: %d\n", allFlows[i].flowNumber);
 	}
 	
@@ -89,18 +98,37 @@ void getFlows(char *fileName)
 	// Read the first line to find how many flows we have
 	fscanf(inputFilePointer, "%d", &numberOfFlows);
 	
-	allFlows = malloc(numberOfFlows * sizeof(flow));
-	remainingFlows = 1;
+	allFlows = malloc(numberOfFlows * sizeof(flowPointer));
+	remainingFlows = 0;
 	while (!feof(inputFilePointer)) {
 		flow inputFlow;
+		
+		//allFlows[remainingFlows - 1] = malloc(sizeof(flow));
+		//flowPointer inputFlow = allFlows[remainingFlows - 1];
+		
 		if (fscanf(inputFilePointer, "%d:%f,%f,%d", &inputFlow.flowNumber, &inputFlow.arrivalTime, &inputFlow.transmissionTime, &inputFlow.priority) != 4) break;
+		//if (fscanf(inputFilePointer, "%d:%f,%f,%d", &inputFlow->flowNumber, &inputFlow->arrivalTime, &inputFlow->transmissionTime, &inputFlow->priority) != 4) break;
 		
 		// Put the times in seconds
 		inputFlow.arrivalTime /= 10;
 		inputFlow.transmissionTime /= 10;
+		//inputFlow->arrivalTime /= 10;
+		//inputFlow->transmissionTime /= 10;
 		
-		// Put all flows into flow structs and put them into the array/makeshift waiting queue.
-		allFlows[remainingFlows - 1] = inputFlow;
+		allFlows[remainingFlows] = malloc(sizeof(flow));
+		allFlows[remainingFlows]->flowNumber = inputFlow.flowNumber;
+		allFlows[remainingFlows]->arrivalTime = inputFlow.arrivalTime;
+		allFlows[remainingFlows]->transmissionTime = inputFlow.transmissionTime;
+		allFlows[remainingFlows]->priority = inputFlow.priority;
+		
+		//printf("DEBUG: Set allFlows[%d] to inputFlow. flowNumber: %d arrivalTime: %f transmissionTime: %f priority: %d.\n", remainingFlows - 1, allFlows[remainingFlows - 1]->flowNumber, allFlows[remainingFlows - 1]->arrivalTime, allFlows[remainingFlows - 1]->transmissionTime, allFlows[remainingFlows - 1]->priority);
+		
+		// Put all flows into flow structs and put them into an array.
+		//allFlows[remainingFlows - 1] = &inputFlow;
+		
+		// Initialize its condition variable
+		pthread_cond_init(&allFlows[remainingFlows]->readyToTransmitCondVar, NULL);
+		
 		remainingFlows ++;
 	}
 	
@@ -115,36 +143,40 @@ void *flowFunction(void *pointer)
 	flowPointer flowInfo = (flowPointer) pointer;
 	
 	// Sleep until its arrival time.
-	sleep(flowInfo->arrivalTime);
-	printf("Flow %d arrives: arrival time (%f), transmission time (%.1f), priority (%d).\n", flowInfo->flowNumber, getElapsedTime(), flowInfo->transmissionTime, flowInfo->priority);
+	usleep(flowInfo->arrivalTime * 1000000);
+	//printf("FLOW: Flow %d arrives: arrival time (%.2f), transmission time (%.1f), priority (%d) condvar address: %p.\n", flowInfo->flowNumber, getElapsedTime(), flowInfo->transmissionTime, flowInfo->priority, &flowInfo->readyToTransmitCondVar);
 	
 	// Add itself to the queue of flows waiting to transmit (mutex protected).
 	pthread_mutex_lock(&flowQueueMutex);
 	for (i = 0; i < numberOfFlows; i ++)
 	{
 		// Find the first empty spot in the queue; the end of the line. A flow with a flow number of 0 is considered empty.
-		if (flowQueue[i].flowNumber == 0)
+		if (flowQueue[i]->flowNumber == 0)
 		{
-			flowQueue[i] = *flowInfo;
-			//printf("AFTER INSERT: Flow %d took queue position %d arrival time %2.2f transmission time %2.2f priority %d\n", flowQueue[i].flowNumber, i, flowQueue[i].arrivalTime, flowQueue[i].transmissionTime, flowQueue[i].priority);
+			flowQueue[i] = flowInfo;
+			//printf("AFTER INSERT: Flow %d took queue position %d arrival time %2.2f transmission time %2.2f priority %d\n", flowQueue[i]->flowNumber, i, flowQueue[i]->arrivalTime, flowQueue[i]->transmissionTime, flowQueue[i]->priority);
+			//printf("DEBUG: Address of condvar in flowQueue: %p. Address of condvar passed into flowFunction: %p.\n", &flowQueue[i]->readyToTransmitCondVar, &flowInfo->readyToTransmitCondVar);
 			break;
 		}
 	}
-	pthread_mutex_unlock(&flowQueueMutex);
+	//pthread_mutex_unlock(&flowQueueMutex);
 	
 	// Waits for its turn to transmit (condvar, w/ mutex).
-	
+	pthread_cond_wait(&flowInfo->readyToTransmitCondVar, &flowQueueMutex);
+
 	// Transmit
-	printf("Flow %d starts its transmission at time %f.\n", flowInfo->flowNumber, getElapsedTime());
-	sleep(flowInfo->transmissionTime);
+	printf("FLOW: Flow %d starts its transmission at time %.2f.\n", flowInfo->flowNumber, getElapsedTime());
+	usleep(flowInfo->transmissionTime * 1000000);
+	printf("FLOW: Flow %d finishes its transmission at time %.2f.\n", flowInfo->flowNumber, getElapsedTime());
 	
 	// Decrement the number of remaining flows (mutex protected).
-	//pthread_mutex_lock(&remainingFlowsMutex);
+	pthread_mutex_lock(&remainingFlowsMutex);
 	remainingFlows --;
-	//pthread_mutex_unlock(&remainingFlowsMutex);
+	pthread_mutex_unlock(&remainingFlowsMutex);
 	
 	// Signals the scheduler that another flow can transmit (condvar, w/ mutex).
-	//pthread_cond_signal(&nobodyTransmittingCondVar);
+	pthread_cond_signal(&nobodyTransmittingCondVar);
+	pthread_mutex_unlock(&flowQueueMutex);
 	
 	return (void *) 0;
 }
@@ -152,15 +184,57 @@ void *flowFunction(void *pointer)
 void *schedulerFunction(void *pointer)
 {
 	// Loop until number of remaining flows == 0:
-    // Waits to be signaled that another flow can transmit.
-	// While the queue of flows waiting to transmit is empty:
-	// {
-			//Do nothing.
-	//	}
-	// Sort the queue of flows waiting to transmit (mutex’d).
+	while (remainingFlows != 0)
+	{	
+		//printf("SCHEDULER: remainingFlows: %d\n", remainingFlows);
+		
+		pthread_mutex_lock(&remainingFlowsMutex);
+		
+		// Waits to be signaled that another flow can transmit.
+		//printf("SCHEDULER: waiting for someone to stop transmitting\n");
+		pthread_cond_wait(&nobodyTransmittingCondVar, &remainingFlowsMutex);
+		//printf("SCHEDULER: Nobody is transmitting. \n");
+		
+		// While the queue of flows waiting to transmit is empty: Do nothing
+		//printf("SCHEDULER: Waiting for someone to be in the queue. \n");
+		while(flowQueue[0]->flowNumber == 0);
+		//printf("SCHEDULER: Someone put themself in the queue! \n");
+		
+		pthread_mutex_unlock(&remainingFlowsMutex);
+		
+		// Sort the queue of flows waiting to transmit (mutex’d).
+		pthread_mutex_lock(&flowQueueMutex);
+		
+		sortQueue(flowQueue);
+		
+		// Remove the head of the queue and signal flow to transmit
+		flowPointer flowToTransmit = flowQueue[0];
+		
+		flow emptyFlow;
+		emptyFlow.flowNumber = 0;
+		flowQueue[0] = &emptyFlow;
+		
+		// Move the rest of the queue down one spot
+		int i;
+		for (i = 1; i < numberOfFlows; i ++)
+		{
+			flowQueue[i - 1] = flowQueue[i];
+		}
+		
+		//printf("SCHEDULER: Signalling flow %d with condvar address %p to transmit.\n", flowToTransmit->flowNumber, &flowToTransmit->readyToTransmitCondVar);
+		 
+		// int i;
+		// for (i = 0; i < numberOfFlows; i ++)
+		// {
+			// printf("SCHEDULER: flowQueue[%d] = flowNumber: %d arrivalTime: %f transmissionTime: %f priority: %d.\n", i, flowQueue[i]->flowNumber, flowQueue[i]->arrivalTime, flowQueue[i]->transmissionTime, flowQueue[i]->priority);
+		// }
 	
+		pthread_cond_signal(&flowToTransmit->readyToTransmitCondVar);
+		pthread_mutex_unlock(&flowQueueMutex);
+		
+	}
 	
-	// Remove the head of the queue and signal flow to transmit
+	printf("SCHEDULER: We're done!\n");
 	
 	return (void *) 0;
 }
@@ -226,4 +300,45 @@ int compareFlows(void *pointerA, void *pointerB)
 		}
 	}
 	
+}
+
+void sortQueue(void *queue)
+{
+	flowPointer *flows = (flowPointer *) queue;
+	// Find the flow that should run next, and put him in spot 0.
+	int i;
+	int highestFlowIndex = 0;
+	flowPointer highestFlow = flows[0];
+	flowPointer currentFlow = flows[0];
+	
+	// for (i = 0; i < numberOfFlows; i ++)
+	// {
+		// printf("BEFORE SWAP: flowQueue[%d] = flowNumber: %d arrivalTime: %f transmissionTime: %f priority: %d.\n", i, flowQueue[i]->flowNumber, flowQueue[i]->arrivalTime, flowQueue[i]->transmissionTime, flowQueue[i]->priority);
+	// }
+	
+	for (i = 1; i < numberOfFlows; i ++)
+	{
+		currentFlow = flows[i];
+		if (currentFlow->flowNumber == 0)
+		{
+			break;
+		}
+		
+		//printf("DEBUG: grabbed queue[%d]. Flow Number is %d.\n", i, currentFlow.flowNumber);
+		if (compareFlows(highestFlow, currentFlow) == 1)
+		{
+			highestFlow = currentFlow;
+			highestFlowIndex = i;
+		}
+	}
+	
+	//printf("DEBUG: The highest flow in the queue is Flow Number %d.\n", highestFlow->flowNumber);
+	// Swap the pointer in the highest position index with the pointer in position 0
+	flowPointer temp = flows[0];
+	flows[0] = flows[highestFlowIndex];
+	flows[highestFlowIndex] = temp;
+	// for (i = 0; i < numberOfFlows; i ++)
+	// {
+		// printf("AFTER SWAP: flowQueue[%d] = flowNumber: %d arrivalTime: %f transmissionTime: %f priority: %d.\n", i, flowQueue[i]->flowNumber, flowQueue[i]->arrivalTime, flowQueue[i]->transmissionTime, flowQueue[i]->priority);
+	// }
 }

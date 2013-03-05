@@ -6,5 +6,6 @@ void *flowFunction(void *pointer);
 void *schedulerFunction(void *pointer);
 double getElapsedTime();
 int compareFlows(void *flowA, void *flowB);
+void sortQueue(void *queue);
 
 #endif
