@@ -170,9 +170,9 @@ void *flowFunction(void *pointer)
 	printf("FLOW: Flow %d finishes its transmission at time %.2f.\n", flowInfo->flowNumber, getElapsedTime());
 	
 	// Decrement the number of remaining flows (mutex protected).
-	pthread_mutex_lock(&remainingFlowsMutex);
-	remainingFlows --;
-	pthread_mutex_unlock(&remainingFlowsMutex);
+	//pthread_mutex_lock(&remainingFlowsMutex);
+	//remainingFlows --;
+	//pthread_mutex_unlock(&remainingFlowsMutex);
 	
 	// Signals the scheduler that another flow can transmit (condvar, w/ mutex).
 	pthread_cond_signal(&nobodyTransmittingCondVar);
@@ -232,6 +232,7 @@ void *schedulerFunction(void *pointer)
 		pthread_cond_signal(&flowToTransmit->readyToTransmitCondVar);
 		pthread_mutex_unlock(&flowQueueMutex);
 		
+		remainingFlows --;
 	}
 	
 	printf("SCHEDULER: We're done!\n");
