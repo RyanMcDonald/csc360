@@ -24,7 +24,10 @@ int remainingFlows;
 flowPointer *allFlows;
 flowPointer *flowQueue;
 
+flowPointer currentlyTransmittingFlow;
+
 pthread_cond_t nobodyTransmittingCondVar = PTHREAD_COND_INITIALIZER;
+pthread_cond_t somebodyTransmittingCondVar = PTHREAD_COND_INITIALIZER;
 
 pthread_mutex_t remainingFlowsMutex = PTHREAD_MUTEX_INITIALIZER;
 pthread_mutex_t flowQueueMutex = PTHREAD_MUTEX_INITIALIZER;
@@ -54,6 +57,9 @@ int main(int argc, char *argv[])
 	{
 		flowQueue[i] = &emptyFlow;
 	}
+	
+	// Initialize the currentlyTransmittingFlow to the emptyFlow because there are no flows tranmsitting yet.
+	currentlyTransmittingFlow = &emptyFlow;
 	
 	// Start scheduler thread
 	pthread_t schedulerThreadId;
@@ -94,7 +100,11 @@ void getFlows(char *fileName)
 	}
 	
 	// Read the first line to find how many flows we have
-	fscanf(inputFilePointer, "%d", &numberOfFlows);
+	if (fscanf(inputFilePointer, "%d", &numberOfFlows) != 1)
+	{
+		fprintf(stderr, "Couldn't get the total number of flows from input file! Is it formatted correctly?\n");
+		exit(1);
+	}
 	
 	allFlows = malloc(numberOfFlows * sizeof(flowPointer));
 	remainingFlows = 0;
@@ -151,6 +161,22 @@ void *flowFunction(void *pointer)
 		}
 	}
 	
+	// Check if there is already a flow transmitting
+	while (1)
+	{
+		pthread_cond_wait(&somebodyTransmittingCondVar, &flowQueueMutex);
+		if (currentlyTransmittingFlow->flowNumber != 0 && currentlyTransmittingFlow->flowNumber != flowInfo->flowNumber)
+		{
+			printf("FLOW: Flow %d waits for the finish of flow %d. \n", flowInfo->flowNumber, currentlyTransmittingFlow->flowNumber);
+		}
+		else
+		{
+			break;
+		}
+	}
+	
+	pthread_cond_signal(&nobodyTransmittingCondVar);
+	
 	// Waits for its turn to transmit (condvar, w/ mutex).
 	pthread_cond_wait(&flowInfo->readyToTransmitCondVar, &flowQueueMutex);
 
@@ -199,8 +225,16 @@ void *schedulerFunction(void *pointer)
 			flowQueue[i - 1] = flowQueue[i];
 		}
 	
-		pthread_cond_signal(&flowToTransmit->readyToTransmitCondVar);
+		currentlyTransmittingFlow = flowToTransmit;
+		
+		// Tell all the threads to output who they are waiting for
+		pthread_cond_broadcast(&somebodyTransmittingCondVar);
+		
+		// Wait for all the threads to finish outputting who they are waiting for
+		pthread_cond_wait(&nobodyTransmittingCondVar, &flowQueueMutex);
+		
 		pthread_mutex_unlock(&flowQueueMutex);
+		pthread_cond_signal(&flowToTransmit->readyToTransmitCondVar);
 		
 		remainingFlows --;
 	}
