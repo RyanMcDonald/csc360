@@ -45,9 +45,11 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "Usage: MFS <input file>\n");
 		return -1;
 	}
-
+	
 	// Parse input file, put all flows into allFlows, initialize remainingFlows
+	pthread_mutex_lock(&remainingFlowsMutex);
 	getFlows(argv[1]);
+	pthread_mutex_unlock(&remainingFlowsMutex);
 	
 	// Create the queue for the threads to wait in. Set the default queue values to an empty flow, i.e., flowNumber = 0.
 	flowQueue = malloc(numberOfFlows * sizeof(flowPointer));
@@ -71,7 +73,7 @@ int main(int argc, char *argv[])
 		pthread_create(&(allFlows[i]->threadId), NULL, flowFunction, allFlows[i]);
 	}
 	
-	// Tell the scheduler to transmit a flow
+	// Tell the scheduler to begin
 	pthread_cond_signal(&nobodyTransmittingCondVar);
 	
 	// Wait for all threads to finish
@@ -200,7 +202,6 @@ void *schedulerFunction(void *pointer)
 		
 		// Waits to be signaled that another flow can transmit.
 		pthread_cond_wait(&nobodyTransmittingCondVar, &remainingFlowsMutex);
-		
 		// While the queue of flows waiting to transmit is empty: Do nothing
 		while(flowQueue[0]->flowNumber == 0);
 		
