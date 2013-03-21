@@ -47,9 +47,7 @@ int main(int argc, char *argv[])
 	}
 	
 	// Parse input file, put all flows into allFlows, initialize remainingFlows
-	pthread_mutex_lock(&remainingFlowsMutex);
 	getFlows(argv[1]);
-	pthread_mutex_unlock(&remainingFlowsMutex);
 	
 	// Create the queue for the threads to wait in. Set the default queue values to an empty flow, i.e., flowNumber = 0.
 	flowQueue = malloc(numberOfFlows * sizeof(flowPointer));
@@ -73,8 +71,12 @@ int main(int argc, char *argv[])
 		pthread_create(&(allFlows[i]->threadId), NULL, flowFunction, allFlows[i]);
 	}
 	
+	pthread_mutex_lock(&remainingFlowsMutex);
+	
 	// Tell the scheduler to begin
+	printf("MAIN: Telling Scheduler to begin!\n");
 	pthread_cond_signal(&nobodyTransmittingCondVar);
+	pthread_mutex_unlock(&remainingFlowsMutex);
 	
 	// Wait for all threads to finish
 	for (i = 0; i < numberOfFlows; i ++)
@@ -152,7 +154,9 @@ void *flowFunction(void *pointer)
 	printf("FLOW: Flow %d arrives: arrival time (%.2f), transmission time (%.1f), priority (%d) condvar address: %p.\n", flowInfo->flowNumber, getElapsedTime(), flowInfo->transmissionTime, flowInfo->priority, &flowInfo->readyToTransmitCondVar);
 	
 	// Add itself to the queue of flows waiting to transmit (mutex protected).
+	//printf("FLOW: Flow %d Trying to gain control of flowQueueMutex!\n", flowInfo->flowNumber);
 	pthread_mutex_lock(&flowQueueMutex);
+	//printf("FLOW: Flow %d Got control of flowQueueMutex!\n", flowInfo->flowNumber);
 	for (i = 0; i < numberOfFlows; i ++)
 	{
 		// Find the first empty spot in the queue; the end of the line. A flow with a flow number of 0 is considered empty.
@@ -163,33 +167,32 @@ void *flowFunction(void *pointer)
 		}
 	}
 	
+	//pthread_mutex_unlock(&flowQueueMutex);
+	
 	// Check if there is already a flow transmitting
-	while (1)
+	//printf("FLOW: Flow %d Trying to gain control of flowQueueMutex!\n", flowInfo->flowNumber);
+	//pthread_mutex_lock(&flowQueueMutex);
+	//printf("FLOW: Flow %d Got control of flowQueueMutex!\n", flowInfo->flowNumber);
+	while (currentlyTransmittingFlow->flowNumber != flowInfo->flowNumber)
 	{
-		pthread_cond_wait(&somebodyTransmittingCondVar, &flowQueueMutex);
-		if (currentlyTransmittingFlow->flowNumber != 0 && currentlyTransmittingFlow->flowNumber != flowInfo->flowNumber)
+		if (currentlyTransmittingFlow->flowNumber != 0)
 		{
 			printf("FLOW: Flow %d waits for the finish of flow %d. \n", flowInfo->flowNumber, currentlyTransmittingFlow->flowNumber);
 		}
-		else
-		{
-			break;
-		}
+		pthread_cond_wait(&somebodyTransmittingCondVar, &flowQueueMutex);
 	}
-	
-	pthread_cond_signal(&nobodyTransmittingCondVar);
-	
-	// Waits for its turn to transmit (condvar, w/ mutex).
-	pthread_cond_wait(&flowInfo->readyToTransmitCondVar, &flowQueueMutex);
 
 	// Transmit
 	printf("FLOW: Flow %d starts its transmission at time %.2f.\n", flowInfo->flowNumber, getElapsedTime());
 	usleep(flowInfo->transmissionTime * 1000000);
 	printf("FLOW: Flow %d finishes its transmission at time %.2f.\n", flowInfo->flowNumber, getElapsedTime());
 	
+	pthread_mutex_unlock(&flowQueueMutex);
+	
+	pthread_mutex_lock(&remainingFlowsMutex);
 	// Signals the scheduler that another flow can transmit (condvar, w/ mutex).
 	pthread_cond_signal(&nobodyTransmittingCondVar);
-	pthread_mutex_unlock(&flowQueueMutex);
+	pthread_mutex_unlock(&remainingFlowsMutex);
 	
 	return (void *) 0;
 }
@@ -198,17 +201,21 @@ void *schedulerFunction(void *pointer)
 {
 	while (remainingFlows != 0)
 	{	
+		//printf("SCHEDULER: Trying to gain control of remainingFlowsMutex!\n");
 		pthread_mutex_lock(&remainingFlowsMutex);
+		//printf("SCHEDULER: Got control of remainingFlowsMutex!\n");
 		
+		//printf("SCHEDULER: Waiting for flows to finish transmitting!\n");
 		// Waits to be signaled that another flow can transmit.
 		pthread_cond_wait(&nobodyTransmittingCondVar, &remainingFlowsMutex);
-		// While the queue of flows waiting to transmit is empty: Do nothing
-		while(flowQueue[0]->flowNumber == 0);
+		//printf("SCHEDULER: Flow finished transmitting!\n");
 		
 		pthread_mutex_unlock(&remainingFlowsMutex);
 		
-		pthread_mutex_lock(&flowQueueMutex);
+		// While the queue of flows waiting to transmit is empty: Do nothing
+		while(flowQueue[0]->flowNumber == 0);
 		
+		pthread_mutex_lock(&flowQueueMutex);
 		// Sort the queue of flows waiting to transmit (mutex’d).
 		sortQueue(flowQueue);
 		
@@ -225,19 +232,16 @@ void *schedulerFunction(void *pointer)
 		{
 			flowQueue[i - 1] = flowQueue[i];
 		}
-	
+		
 		currentlyTransmittingFlow = flowToTransmit;
 		
-		// Tell all the threads to output who they are waiting for
-		pthread_cond_broadcast(&somebodyTransmittingCondVar);
+		//pthread_mutex_unlock(&flowQueueMutex);
 		
-		// Wait for all the threads to finish outputting who they are waiting for
-		pthread_cond_wait(&nobodyTransmittingCondVar, &flowQueueMutex);
-		
-		pthread_mutex_unlock(&flowQueueMutex);
-		pthread_cond_signal(&flowToTransmit->readyToTransmitCondVar);
-		
+		//pthread_mutex_lock(&remainingFlowsMutex);
 		remainingFlows --;
+		//printf("SCHEDULER: Signalling flow %d to begin!\n", currentlyTransmittingFlow->flowNumber);
+		pthread_cond_broadcast(&somebodyTransmittingCondVar);
+		pthread_mutex_unlock(&flowQueueMutex);
 	}
 	
 	return (void *) 0;
