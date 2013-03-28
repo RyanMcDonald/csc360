@@ -21,9 +21,9 @@
 #include "disklist.h"
 
 typedef struct {
+	char *file_type;
 	char *file_name;
 	int file_size;
-	char *file_type;
 	
 } file_struct;
 
@@ -61,7 +61,7 @@ int main(int argc, char *argv[])
 		
 		int i;
 		for (i = 0; i < number_files_in_root; i ++) {
-			printf("%1s %20s\n", root_files[i]->file_type, root_files[i]->file_name);
+			printf("%1s %10d %20s\n", root_files[i]->file_type, root_files[i]->file_size, root_files[i]->file_name);
 		}
 		
 	} else {
@@ -119,10 +119,11 @@ void get_files_in_root(char *mmap, int num_files_in_root) {
 			
 			if ((attributeValue & 0x0F) != 0x0F && (attributeValue & 0x08) != 0x08 && (attributeValue & 0x10) != 0x10) {
 				root_files[index] = malloc(sizeof(file_struct));
-				root_files[index]->file_name = malloc(sizeof(char) * 11);
-				root_files[index]->file_type = malloc(sizeof(char));
+				root_files[index]->file_name = malloc(sizeof(char) * 12);
+				root_files[index]->file_type = malloc(sizeof(char) * 2);
 				get_file_name(mmap, root_files[index]->file_name, offset);
 				get_file_type(mmap, root_files[index]->file_type, offset);
+				root_files[index]->file_size = get_file_size(mmap, offset);
 				
 				index ++;
 			}
@@ -130,30 +131,40 @@ void get_files_in_root(char *mmap, int num_files_in_root) {
 	}
 }
 
+void get_file_type(char *mmap, char *file_type, int offset) {
+	int attributeValue = mmap[offset + 11];
+	
+	//file_type = malloc(sizeof(char));
+	file_type[0] = 'F';
+	file_type[1] = '\0';
+	if (attributeValue == 0x10) {
+		file_type[0] = 'D';
+	}
+}
+
 void get_file_name(char *mmap, char *file_name, int offset) {
 	int i;
 	char *temp_file_name = malloc(sizeof(char) * 8);
-	char *temp_file_extension = malloc(sizeof(char) * 3);
 	for(i = 0; i < 8; i ++) {
 		if (!isspace(mmap[offset + i])) {
 			temp_file_name[i] = mmap[offset + i];
 		} else {
-			//temp_file_name[i] = '\0';
+			temp_file_name[i] = '\0';
 			break;
 		}
 	}
 	
 	int j;
+	char *temp_file_extension = malloc(sizeof(char) * 3);
 	for (j = 0; j < 3; j ++) {
 		if (!isspace(mmap[offset + 8 + j])) {
 			temp_file_extension[j] = mmap[offset + 8 + j];
 		} else {
-			//temp_file_extension[j] = '\0';
+			temp_file_extension[j] = '\0';
 			break;
 		}
 	}
 	
-	//file_name = malloc(sizeof(char) * 11);
 	strcpy(file_name, temp_file_name);
 	strcat(file_name, ".");
 	strcat(file_name, temp_file_extension);
@@ -161,14 +172,8 @@ void get_file_name(char *mmap, char *file_name, int offset) {
 	free(temp_file_extension);
 }
 
-void get_file_type(char *mmap, char *file_type, int offset) {
-	int attributeValue = mmap[offset + 11];
-	
-	//file_type = malloc(sizeof(char));
-	file_type[0] = 'F';
-	if (attributeValue == 0x10) {
-		file_type[0] = 'D';
-	}
+int get_file_size(char *mmap, int offset) {
+	return get_four_byte_value(mmap, offset + 28);
 }
 
 int get_two_byte_value(char *mmap, int offset) {
@@ -176,7 +181,6 @@ int get_two_byte_value(char *mmap, int offset) {
 	int *tmp2 = malloc(sizeof(int));
 	int retVal;
 	
-	// Beginning of data area starts at byte 33 of the boot sector and is 2 bytes in length
 	* tmp1 = (unsigned char) mmap[offset];
 	* tmp2 = (unsigned char) mmap[offset + 1];
 	
@@ -185,6 +189,29 @@ int get_two_byte_value(char *mmap, int offset) {
 	
 	free(tmp1);
 	free(tmp2);
+	
+	return retVal;
+}
+
+int get_four_byte_value(char *mmap, int offset) {
+	int *tmp1 = malloc(sizeof(int));
+	int *tmp2 = malloc(sizeof(int));
+	int *tmp3 = malloc(sizeof(int));
+	int *tmp4 = malloc(sizeof(int));
+	int retVal;
+	
+	* tmp1 = (unsigned char) mmap[offset];
+	* tmp2 = (unsigned char) mmap[offset + 1];
+	* tmp3 = (unsigned char) mmap[offset + 2];
+	* tmp4 = (unsigned char) mmap[offset + 3];
+	
+	// Switch to Big Endian format
+	retVal = *tmp1 + ((*tmp4) << 16) + ((*tmp3) << 12) + ((*tmp2) << 8);
+	
+	free(tmp1);
+	free(tmp2);
+	free(tmp3);
+	free(tmp4);
 	
 	return retVal;
 }
