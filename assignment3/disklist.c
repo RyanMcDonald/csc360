@@ -24,6 +24,8 @@ typedef struct {
 	char *file_type;
 	char *file_name;
 	int file_size;
+	char *file_creation_date;
+	char *file_creation_time;
 	
 } file_struct;
 
@@ -61,7 +63,7 @@ int main(int argc, char *argv[])
 		
 		int i;
 		for (i = 0; i < number_files_in_root; i ++) {
-			printf("%1s %10d %20s\n", root_files[i]->file_type, root_files[i]->file_size, root_files[i]->file_name);
+			printf("%1s %10d %20s %10s %5s\n", root_files[i]->file_type, root_files[i]->file_size, root_files[i]->file_name, root_files[i]->file_creation_date, root_files[i]->file_creation_time);
 		}
 		
 	} else {
@@ -119,11 +121,20 @@ void get_files_in_root(char *mmap, int num_files_in_root) {
 			
 			if ((attributeValue & 0x0F) != 0x0F && (attributeValue & 0x08) != 0x08 && (attributeValue & 0x10) != 0x10) {
 				root_files[index] = malloc(sizeof(file_struct));
+				
 				root_files[index]->file_name = malloc(sizeof(char) * 12);
-				root_files[index]->file_type = malloc(sizeof(char) * 2);
 				get_file_name(mmap, root_files[index]->file_name, offset);
+				
+				root_files[index]->file_type = malloc(sizeof(char) * 2);
 				get_file_type(mmap, root_files[index]->file_type, offset);
+				
 				root_files[index]->file_size = get_file_size(mmap, offset);
+				
+				root_files[index]->file_creation_date = malloc(sizeof(char) * 10);
+				get_file_creation_date(mmap, root_files[index]->file_creation_date, offset);
+				
+				root_files[index]->file_creation_time = malloc(sizeof(char) * 5);
+				get_file_creation_time(mmap, root_files[index]->file_creation_time, offset);
 				
 				index ++;
 			}
@@ -174,6 +185,39 @@ void get_file_name(char *mmap, char *file_name, int offset) {
 
 int get_file_size(char *mmap, int offset) {
 	return get_four_byte_value(mmap, offset + 28);
+}
+
+void get_file_creation_date(char *mmap, char *file_creation_date, int offset) {
+	int date = get_two_byte_value(mmap, offset + 16);
+	printf("File creation date: %x\n", date);
+	
+	// day is the first five bits: 11111 binary = 31 decimal
+	int day = date & 31;
+	
+	// month is the middle 4 bits. Shift them right until they are the low order bits. 1111 binary = 15 decimal.
+	int month = (date >> 5) & 15;
+	
+	// year is the last 7 bits. Shift them right until they are the low order bits. 1111111 binary = 127
+	// Since the year is based at 1980, we must also add 1980 to it.
+	int year = ((date >> 9) & 127) + 1980;
+	
+	sprintf(file_creation_date, "%d-%02d-%02d", year, month, day);
+}
+
+void get_file_creation_time(char *mmap, char *file_creation_time, int offset) {
+	int time = get_two_byte_value(mmap, offset + 14);
+	
+	// seconds is the first five bits: 11111 binary = 31 decimal. They are counted in two second intervals so we must multiply by 2.
+	int seconds = (time & 31) * 2;
+	
+	// minutes is the middle 6 bits. Shift them right until they are the low order bits. 111111 binary = 63 decimal.
+	int minutes = (time >> 5) & 63;
+	
+	// hours is the last 5 bits. Shift them right until they are the low order bits. 11111 binary = 31
+	// Since the year is based at 1980, we must also add 1980 to it.
+	int hours = (time >> 11) & 31;
+	
+	sprintf(file_creation_time, "%02d:%02d:%02d", hours, minutes, seconds);
 }
 
 int get_two_byte_value(char *mmap, int offset) {
